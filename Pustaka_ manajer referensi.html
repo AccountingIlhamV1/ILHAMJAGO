@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pustaka: manajer referensi</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&display=swap">
+<style>
+:root{--bg:#f5f6f2;--surface:#fff;--ink:#1c2a29;--mute:#5b6967;--line:#d8ded9;--acc:#1f6f6b;--accink:#fff;--soft:#e4efec;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1716;--surface:#172220;--ink:#e5eeec;--mute:#92a29f;--line:#293633;--acc:#5fc2bb;--accink:#0a1312;--soft:#1d2f2c;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1716;--surface:#172220;--ink:#e5eeec;--mute:#92a29f;--line:#293633;--acc:#5fc2bb;--accink:#0a1312;--soft:#1d2f2c;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 48px}
+h1{font:600 30px/1.1 Literata,Georgia,serif;margin:0 0 4px}
+.lead{color:var(--mute);margin:0 0 18px}
+.grid{display:grid;gap:16px}
+@media(min-width:860px){.grid{grid-template-columns:1.1fr 1fr;align-items:start}.sticky{position:sticky;top:12px}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+input,select,textarea,button{font:inherit;color:inherit}
+input,select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+button{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer}
+button.pri{background:var(--acc);color:var(--accink);border-color:var(--acc);font-weight:600}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#q{flex:1 1 160px;width:auto}
+ul{list-style:none;margin:0;padding:0}
+.row{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.pick input{width:18px;height:18px;margin-top:3px}
+.meta{flex:1;min-width:0}
+.t{font:600 15px/1.35 Literata,Georgia,serif}
+.s{color:var(--mute);font-size:13px}
+.act{display:flex;gap:6px}
+.act button{padding:4px 8px;font-size:13px}
+.empty{color:var(--mute);padding:18px 0}
+h2{font:600 16px/1.2 Literata,Georgia,serif;margin:0 0 8px}
+.out{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;font:15px/1.55 Literata,Georgia,serif;min-height:44px;overflow-wrap:anywhere}
+.bp{margin:0 0 8px}
+.mute{color:var(--mute)}
+.sec{margin-bottom:14px}
+.sec .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.chip{background:var(--soft);border-radius:99px;padding:2px 10px;font-size:13px}
+details{margin-top:14px}
+summary{cursor:pointer;font-weight:600}
+textarea{min-height:110px;font:13px/1.4 ui-monospace,Menlo,monospace;margin:8px 0}
+dialog{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:16px;width:min(560px,94vw)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.f{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+.f label{display:block;font-size:13px;color:var(--mute)}
+.f .w{grid-column:1/-1}
+#toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pustaka</h1>
+  <p class="lead">Simpan referensi di satu tempat, lalu tempel sitasi dan daftar pustaka langsung ke Word.</p>
+  <div class="grid">
+    <section class="card" aria-label="Perpustakaan">
+      <div class="bar">
+        <input id="q" type="search" placeholder="Cari judul, penulis, tahun" aria-label="Cari referensi">
+        <button class="pri" id="add">Tambah referensi</button>
+      </div>
+      <ul id="list"></ul>
+      <details>
+        <summary>Impor dan ekspor</summary>
+        <p class="mute">Tempel isi file BibTeX (.bib) atau RIS (.ris), atau pilih filenya. Ekspor memakai referensi yang dipilih, atau semuanya jika tidak ada yang dipilih.</p>
+        <input type="file" id="file" accept=".bib,.ris,.txt" aria-label="Pilih file BibTeX atau RIS">
+        <textarea id="io" aria-label="Isi BibTeX atau RIS" placeholder="@article{kusuma2024, ..."></textarea>
+        <div class="bar"><button id="imp">Impor</button><button id="exp">Ekspor BibTeX</button><button id="cpio">Salin teks</button></div>
+      </details>
+    </section>
+    <section class="card sticky" aria-label="Hasil sitasi">
+      <div class="bar" style="align-items:center">
+        <select id="style" style="width:auto;flex:1" aria-label="Gaya sitasi">
+          <option value="apa">APA 7</option><option value="harvard">Harvard</option><option value="ieee">IEEE</option>
+        </select>
+        <span class="chip" id="count">0 dipilih</span>
+      </div>
+      <div class="sec"><div class="head"><h2>Sitasi di teks</h2><button id="cc">Salin</button></div><div class="out" id="cites"></div></div>
+      <div class="sec"><div class="head"><h2>Daftar pustaka</h2><button class="pri" id="cb">Salin untuk Word</button></div><div class="out" id="bib"></div></div>
+    </section>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <h2 id="dt">Tambah referensi</h2>
+  <div class="f">
+    <div><label for="f-type">Jenis</label><select id="f-type"><option value="jurnal">Artikel jurnal</option><option value="buku">Buku</option><option value="web">Situs web</option></select></div>
+    <div><label for="f-year">Tahun</label><input id="f-year" inputmode="numeric"></div>
+    <div class="w"><label for="f-authors">Penulis (pisahkan dengan titik koma: Belakang, Depan)</label><input id="f-authors" placeholder="Kusuma, Ilham; Rahma, Sari"></div>
+    <div class="w"><label for="f-title">Judul</label><input id="f-title"></div>
+    <div class="w"><label for="f-container">Nama jurnal / situs</label><input id="f-container"></div>
+    <div><label for="f-volume">Volume</label><input id="f-volume"></div>
+    <div><label for="f-issue">Nomor</label><input id="f-issue"></div>
+    <div><label for="f-pages">Halaman</label><input id="f-pages" placeholder="12–25"></div>
+    <div><label for="f-publisher">Penerbit</label><input id="f-publisher"></div>
+    <div><label for="f-doi">DOI</label><input id="f-doi" placeholder="10.1000/xyz123"></div>
+    <div><label for="f-url">URL</label><input id="f-url"></div>
+  </div>
+  <div class="bar" style="margin:14px 0 0;justify-content:flex-end"><button id="cancel">Batal</button><button class="pri" id="save">Simpan</button></div>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let refs=[],sel=new Set(),editing=null;
+try{refs=JSON.parse(localStorage.getItem('pustaka:refs')||'[]')}catch(e){}
+const persist=()=>{try{localStorage.setItem('pustaka:refs',JSON.stringify(refs))}catch(e){}};
+const uid=()=>Math.random().toString(36).slice(2,9);
+const mk=o=>{Object.keys(o).forEach(k=>o[k]===undefined&&delete o[k]);return Object.assign({id:uid(),type:'jurnal',authors:[],year:'',title:'',container:'',volume:'',issue:'',pages:'',publisher:'',doi:'',url:''},o)};
+function parseAuthors(s){return String(s||'').split(/;|\s+and\s+/i).map(x=>x.trim()).filter(Boolean).map(a=>{if(a.includes(',')){const p=a.split(',');return{family:p[0].trim(),given:p.slice(1).join(',').trim()}}const p=a.split(/\s+/);return{family:p.pop(),given:p.join(' ')}})}
+const auStr=a=>(a||[]).map(x=>x.family+(x.given?', '+x.given:'')).join('; ');
+const ini=g=>(g||'').split(/[\s.\-]+/).filter(Boolean).map(w=>w[0].toUpperCase()+'.');
+const doiU=r=>r.doi?'https://doi.org/'+r.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//,''):(r.url||'');
+const join=(l,last)=>l.length<2?l.join(''):l.slice(0,-1).join(', ')+last+l[l.length-1];
+
+const F={
+apa:{hang:1,
+ cite:r=>{const a=r.authors;const n=!a.length?esc(r.title):a.length==1?esc(a[0].family):a.length==2?esc(a[0].family)+' &amp; '+esc(a[1].family):esc(a[0].family)+' et al.';return n+', '+esc(r.year||'t.t.')},
+ ref:r=>{const au=join(r.authors.map(a=>a.family+(a.given?', '+ini(a.given).join(' '):'')),(r.authors.length>2?',':'')+' & ');let s=(au?esc(au)+' ':'')+'('+esc(r.year||'t.t.')+'). ';
+  if(r.type=='buku')s+='<i>'+esc(r.title)+'</i>.'+(r.publisher?' '+esc(r.publisher)+'.':'');
+  else if(r.type=='web')s+=esc(r.title)+'.'+(r.container?' <i>'+esc(r.container)+'</i>.':'');
+  else s+=esc(r.title)+'. <i>'+esc(r.container)+'</i>'+(r.volume?', <i>'+esc(r.volume)+'</i>':'')+(r.issue?'('+esc(r.issue)+')':'')+(r.pages?', '+esc(r.pages):'')+'.';
+  const u=doiU(r);return s+(u?' '+esc(u):'')}},
+harvard:{hang:1,
+ cite:r=>{const a=r.authors;const n=!a.length?esc(r.title):a.length==1?esc(a[0].family):a.length==2?esc(a[0].family)+' and '+esc(a[1].family):esc(a[0].family)+' et al.';return n+', '+esc(r.year||'n.d.')},
+ ref:r=>{const au=join(r.authors.map(a=>a.family+(a.given?', '+ini(a.given).join(''):'')),' and ');let s=(au?esc(au)+' ':'')+'('+esc(r.year||'n.d.')+') ';
+  if(r.type=='buku')s+='<i>'+esc(r.title)+'</i>.'+(r.publisher?' '+esc(r.publisher)+'.':'');
+  else if(r.type=='web')s+='<i>'+esc(r.title)+'</i>.'+(r.container?' '+esc(r.container)+'.':'');
+  else s+='‘'+esc(r.title)+'’, <i>'+esc(r.container)+'</i>'+(r.volume?', '+esc(r.volume):'')+(r.issue?'('+esc(r.issue)+')':'')+(r.pages?', pp. '+esc(r.pages):'')+'.';
+  const u=doiU(r);return s+(u?' Available at: '+esc(u):'')}},
+ieee:{hang:0,
+ cite:(r,i)=>'['+i+']',
+ ref:(r,i)=>{const au=join(r.authors.map(a=>(a.given?ini(a.given).join(' ')+' ':'')+a.family),r.authors.length>2?', and ':' and ');const p=[];
+  if(r.type=='buku'){p.push('<i>'+esc(r.title)+'</i>');r.publisher&&p.push(esc(r.publisher));r.year&&p.push(esc(r.year))}
+  else{p.push('“'+esc(r.title)+',”');}
+  let s='['+i+'] '+(au?esc(au)+', ':'');
+  if(r.type=='buku')return s+p.join(', ')+'.';
+  const q=[];r.container&&q.push('<i>'+esc(r.container)+'</i>');r.volume&&q.push('vol. '+esc(r.volume));r.issue&&q.push('no. '+esc(r.issue));r.pages&&q.push('pp. '+esc(r.pages));r.year&&q.push(esc(r.year));
+  const u=doiU(r);return s+p[0]+' '+q.join(', ')+'.'+(u?' '+esc(u):'')}}
+};
+
+function render(){
+  const q=$('#q').value.toLowerCase();
+  const l=refs.filter(r=>(r.title+' '+auStr(r.authors)+' '+r.year+' '+r.container).toLowerCase().includes(q));
+  $('#list').innerHTML=l.length?l.map(r=>`<li class="row"><label class="pick"><input type="checkbox" data-pick="${r.id}" ${sel.has(r.id)?'checked':''} aria-label="Pilih referensi"></label><div class="meta"><div class="t">${esc(r.title)}</div><div class="s">${esc(auStr(r.authors)||'Tanpa penulis')}, ${esc(r.year||'t.t.')}${r.container?', '+esc(r.container):''}</div></div><div class="act"><button data-edit="${r.id}">Ubah</button><button data-del="${r.id}">Hapus</button></div></li>`).join(''):`<li class="empty">${refs.length?'Tidak ada yang cocok dengan pencarian.':'Belum ada referensi. Tambahkan secara manual atau impor file BibTeX/RIS.'}</li>`;
+  $('#count').textContent=sel.size+' dipilih';gen();
+}
+function gen(){
+  const f=F[$('#style').value];const s=refs.filter(r=>sel.has(r.id));
+  if(!s.length){$('#cites').innerHTML='<span class="mute">Pilih referensi di daftar untuk membuat sitasi.</span>';$('#bib').innerHTML='';return}
+  const ord=f.hang?[...s].sort((a,b)=>(auStr(a.authors)||a.title).localeCompare(auStr(b.authors)||b.title)):s;
+  const inner=s.map((r,i)=>f.cite(r,i+1));
+  $('#cites').innerHTML=f.hang?'('+inner.join('; ')+')':inner.join(', ');
+  $('#bib').innerHTML=ord.map((r,i)=>`<p class="bp" style="${f.hang?'margin:0 0 6pt .5in;text-indent:-.5in':'margin:0 0 6pt'}">${f.ref(r,f.hang?0:i+1)}</p>`).join('');
+}
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2400)}
+async function copy(html){
+  const d=document.createElement('div');d.innerHTML=html;const text=d.innerText||d.textContent;let ok=false;
+  try{await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([text],{type:'text/plain'})})]);ok=true}
+  catch(e){try{d.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(d);const r=document.createRange();r.selectNodeContents(d);const g=getSelection();g.removeAllRanges();g.addRange(r);ok=document.execCommand('copy');g.removeAllRanges();d.remove()}catch(e2){}}
+  toast(ok?'Tersalin. Tempel di Word.':'Gagal menyalin. Blok teks lalu salin manual.');
+}
+const FIELDS=['type','year','authors','title','container','volume','issue','pages','publisher','doi','url'];
+function openForm(r){editing=r?r.id:null;$('#dt').textContent=r?'Ubah referensi':'Tambah referensi';
+  FIELDS.forEach(k=>{$('#f-'+k).value=r?(k=='authors'?auStr(r.authors):r[k]||''):(k=='type'?'jurnal':'')});$('#dlg').showModal()}
+function saveForm(){
+  const o={};FIELDS.forEach(k=>o[k]=$('#f-'+k).value.trim());o.authors=parseAuthors(o.authors);
+  if(!o.title){toast('Judul wajib diisi.');return}
+  if(editing){refs=refs.map(r=>r.id==editing?Object.assign(r,o):r)}else refs.unshift(mk(o));
+  persist();$('#dlg').close();render();
+}
+function parseBib(t){const out=[];t.split(/@(?=\w+\s*\{)/).slice(1).forEach(b=>{const m=b.match(/^(\w+)\s*\{/);if(!m)return;const f={};const re=/(\w+)\s*=\s*(?:\{((?:[^{}]|\{[^{}]*\})*)\}|"([^"]*)"|(\w+))/g;let x;
+  while((x=re.exec(b)))f[x[1].toLowerCase()]=(x[2]!=null?x[2]:x[3]!=null?x[3]:x[4]||'').replace(/[{}]/g,'').trim();
+  const ty=m[1].toLowerCase();out.push(mk({type:ty=='article'?'jurnal':/book/.test(ty)?'buku':'web',authors:parseAuthors(f.author),year:f.year,title:f.title,container:f.journal||f.booktitle||f.howpublished,volume:f.volume,issue:f.number,pages:(f.pages||'').replace(/--/g,'–'),publisher:f.publisher,doi:f.doi,url:f.url}))});return out}
+function parseRis(t){const out=[];let c=null;t.split(/\r?\n/).forEach(l=>{const m=l.match(/^([A-Z][A-Z0-9])\s{2}-\s?(.*)$/);if(!m)return;const k=m[1],v=m[2].trim();
+  if(k=='TY'){c={au:[],ty:v}}else if(!c){return}
+  else if(k=='ER'){out.push(mk({type:c.ty=='BOOK'?'buku':c.ty=='JOUR'?'jurnal':'web',authors:c.au.map(a=>parseAuthors(a)[0]),year:(c.PY||c.Y1||'').slice(0,4),title:c.TI||c.T1,container:c.JO||c.JF||c.T2,volume:c.VL,issue:c.IS,pages:c.SP?c.SP+(c.EP?'–'+c.EP:''):'',publisher:c.PB,doi:c.DO,url:c.UR}));c=null}
+  else if(k=='AU'||k=='A1')c.au.push(v);else c[k]=v});return out}
+function toBib(){return refs.filter(r=>!sel.size||sel.has(r.id)).map(r=>{const t=r.type=='buku'?'book':r.type=='jurnal'?'article':'misc';const k=((r.authors[0]&&r.authors[0].family||'ref')+(r.year||'')).replace(/\W/g,'');
+  const fl=[['author',r.authors.map(a=>a.family+(a.given?', '+a.given:'')).join(' and ')],['title',r.title],[r.type=='jurnal'?'journal':'howpublished',r.container],['year',r.year],['volume',r.volume],['number',r.issue],['pages',(r.pages||'').replace(/–/g,'--')],['publisher',r.publisher],['doi',r.doi],['url',r.url]].filter(x=>x[1]);
+  return '@'+t+'{'+k+',\n'+fl.map(x=>'  '+x[0]+' = {'+x[1]+'}').join(',\n')+'\n}'}).join('\n\n')}
+function doImport(t){const l=/^\s*@/m.test(t)?parseBib(t):parseRis(t);if(!l.length){toast('Tidak ada referensi yang terbaca.');return}refs=l.concat(refs);persist();render();toast(l.length+' referensi diimpor.')}
+
+$('#q').oninput=render;$('#style').onchange=gen;
+$('#add').onclick=()=>openForm();$('#cancel').onclick=()=>$('#dlg').close();$('#save').onclick=saveForm;
+$('#list').onchange=e=>{const id=e.target.dataset.pick;if(!id)return;e.target.checked?sel.add(id):sel.delete(id);render()};
+$('#list').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.edit)openForm(refs.find(r=>r.id==b.dataset.edit));
+  if(b.dataset.del&&confirm('Hapus referensi ini?')){refs=refs.filter(r=>r.id!=b.dataset.del);sel.delete(b.dataset.del);persist();render()}};
+$('#cc').onclick=()=>sel.size?copy($('#cites').innerHTML):toast('Pilih referensi dulu.');
+$('#cb').onclick=()=>sel.size?copy($('#bib').innerHTML):toast('Pilih referensi dulu.');
+$('#imp').onclick=()=>{const t=$('#io').value.trim();t?doImport(t):toast('Tempel isi file dulu.')};
+$('#exp').onclick=()=>{$('#io').value=toBib()||'';toast(refs.length?'Siap disalin.':'Belum ada referensi.')};
+$('#cpio').onclick=()=>{$('#io').select();try{document.execCommand('copy');toast('Tersalin.')}catch(e){toast('Salin manual.')}};
+$('#file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>doImport(String(r.result));r.readAsText(f)};
+render();
+</script>
+</body>
+</html>
