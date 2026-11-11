@@ -63,12 +63,14 @@ dialog h2{border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:12
 #draft{font:16px/1.7 "Times New Roman",Literata,Georgia,serif;min-height:52vh;margin:0 0 8px}
 .small{font-size:14px;margin:0}
 .k{color:var(--acc);font-size:13px;font-family:ui-monospace,Menlo,monospace;margin-left:6px}
-.paper{background:var(--surface);border:1px solid var(--line);padding:16px 18px;font:16px/1.7 "Times New Roman",Literata,Georgia,serif;overflow-wrap:anywhere;max-height:70vh;overflow:auto}
-.paper p{margin:0 0 .6em;text-align:justify}
+.paper{background:var(--surface);border:1px solid var(--line);padding:16px 18px;font:16px/1.7 "Times New Roman",Literata,Georgia,serif;overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto;max-height:70vh;overflow:auto}
+.paper p{margin:0 0 .6em;text-align:justify;text-justify:inter-word}
+.paper p.bib{text-align:left;overflow-wrap:anywhere}
 .paper p.ph1{font-weight:700;font-size:1.1em;text-align:left}
 .paper p.ph2{font-weight:700;text-align:left}
 .paper p.pbt{text-align:center;font-weight:700;margin-top:1.2em}
 .paper p.hang{padding-left:.5in;text-indent:-.5in;text-align:left}
+@media(max-width:640px){.paper{padding:12px;font-size:15px}.paper p{text-align:left}.paper p.hang{padding-left:.35in;text-indent:-.35in}}
 mark{background:var(--soft);color:inherit;outline:1px dashed var(--acc)}
 .act{flex-wrap:wrap;justify-content:flex-end;max-width:180px}
 #toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:2px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
@@ -137,7 +139,7 @@ mark{background:var(--soft);color:inherit;outline:1px dashed var(--acc)}
     <div><label for="f-type">Jenis</label><select id="f-type"><option value="jurnal">Artikel jurnal</option><option value="buku">Buku</option><option value="web">Situs web</option></select></div>
     <div><label for="f-year">Tahun</label><input id="f-year" inputmode="numeric"></div>
     <div class="w"><label for="f-authors">Penulis (pisahkan dengan titik koma: Belakang, Depan)</label><input id="f-authors" placeholder="Kusuma, Ilham; Rahma, Sari"></div>
-    <div class="w"><label for="f-title">Judul</label><input id="f-title"></div>
+    <div class="w"><label for="f-title">Judul (lindungi nama diri dengan kurung kurawal, mis. {Sidoarjo})</label><input id="f-title"></div>
     <div class="w"><label for="f-container">Nama jurnal / situs</label><input id="f-container"></div>
     <div><label for="f-volume">Volume</label><input id="f-volume"></div>
     <div><label for="f-issue">Nomor</label><input id="f-issue"></div>
@@ -164,31 +166,93 @@ const ini=g=>(g||'').split(/[\s.\-]+/).filter(Boolean).map(w=>w[0].toUpperCase()
 const doiU=r=>r.doi?'https://doi.org/'+r.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//,''):(r.url||'');
 const join=(l,last)=>l.length<2?l.join(''):l.slice(0,-1).join(', ')+last+l[l.length-1];
 
+/* ===== Mesin gaya sitasi ===== */
+const cleanDoi=d=>String(d||'').replace(/^https?:\/\/(dx\.)?doi\.org\//i,'');
+const KEEP=new Set(['indonesia','indonesian','jawa','java','sumatra','sumatera','bali','kalimantan','sulawesi','papua','madura','surabaya','sidoarjo','jakarta','bandung','yogyakarta','asia','asean','eropa','europe','european','amerika','america','american','afrika','africa','inggris','english','islam','islamic','covid','covid-19','pancasila','google','facebook','instagram','tiktok','youtube','whatsapp']);
+const AFTERP=/^(di|ke|dari|in|at|from)$/i;
+const NOTPROP=new Set(['era','masa','tengah','antara','dalam','atas','bawah','luar','sekitar','bidang','sektor','kalangan']);
+function sc(title){
+  let t=String(title||'').replace(/\s+/g,' ').trim();if(!t)return '';
+  const prot=[];t=t.replace(/\{([^{}]*)\}/g,(m,x)=>{prot.push(x);return '\u0001'+(prot.length-1)+'\u0002'});
+  const back=x=>x.replace(/\u0001(\d+)\u0002/g,(m,i)=>prot[i]);
+  const words=t.split(' '),allCaps=!/[a-z]/.test(t);
+  const L=words.filter(w=>/^[^A-Za-z]*[A-Za-z]{4,}/.test(w)&&!w.includes('\u0001'));
+  const C=L.filter(w=>/^[^A-Za-z]*[A-Z]/.test(w));
+  if(!allCaps&&!(L.length>=2&&C.length/L.length>=0.7))return back(t);
+  let prev='',pk=false;
+  const trim=x=>x.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g,'');
+  const out=words.map((w,i)=>{
+    if(w.includes('\u0001')){prev=w;pk=true;return w}
+    const core=trim(w),low=core.toLowerCase(),pc=trim(prev);
+    const first=i==0||/[:?!.\u2014\u2013]$/.test(prev),capd=/^[A-Z]/.test(core);
+    let r,keep=false;
+    if(!allCaps&&(/^[A-Z0-9][A-Z0-9&\/\-]+$/.test(core)||/[a-z][A-Z]/.test(core)))r=w;
+    else if(KEEP.has(low)){r=w.replace(/[A-Za-z]/,c=>c.toUpperCase());keep=true}
+    else if(first)r=w.toLowerCase().replace(/[a-z]/,c=>c.toUpperCase());
+    else if(capd&&!allCaps&&((AFTERP.test(pc)&&!NOTPROP.has(low))||pk)){r=w;keep=true}
+    else r=w.toLowerCase();
+    prev=w;pk=keep;return r});
+  return back(out.join(' '))}
+const shortT=(r,it,q)=>{const w=sc(r.title).split(' ');const x=w.slice(0,4).join(' ')+(w.length>4?'…':'');return it?'<i>'+esc(x)+'</i>':q[0]+esc(x)+q[1]};
+const ends=x=>/[.?!]$/.test(x)?x:x+'.';
+const pgs=p=>p?(/[–\-]/.test(p)?'pp. ':'p. ')+esc(p):'';
+const yrOf=(r,nd)=>(r.year||nd)+(YS.get(r)||'');
+let YS=new Map();
+function apaNames(as){const l=as.map(a=>a.family+(a.given?', '+ini(a.given).join(' '):''));
+  if(l.length>20)return l.slice(0,19).join(', ')+', . . . '+l[l.length-1];
+  if(l.length<2)return l.join('');return l.slice(0,-1).join(', ')+', & '+l[l.length-1]}
+function hvNames(as){const l=as.map(a=>a.family+(a.given?', '+ini(a.given).join(''):''));
+  if(l.length>3)return l[0]+' et al.';if(l.length<2)return l.join('');return l.slice(0,-1).join(', ')+' and '+l[l.length-1]}
+function ieNames(as){const l=as.map(a=>(a.given?ini(a.given).join(' ')+' ':'')+a.family);
+  if(l.length>6)return l[0]+' et al.';if(l.length<2)return l.join('');if(l.length==2)return l[0]+' and '+l[1];return l.slice(0,-1).join(', ')+', and '+l[l.length-1]}
+function ieNums(ns){const o=[];for(let i=0;i<ns.length;){let j=i;while(j+1<ns.length&&ns[j+1]==ns[j]+1)j++;if(j-i>=2)o.push('['+ns[i]+']–['+ns[j]+']');else for(let k=i;k<=j;k++)o.push('['+ns[k]+']');i=j+1}return o.join(', ')}
+
 const F={
-apa:{hang:1,
- cite:r=>{const a=r.authors;const n=!a.length?esc(r.title):a.length==1?esc(a[0].family):a.length==2?esc(a[0].family)+' &amp; '+esc(a[1].family):esc(a[0].family)+' et al.';return n+', '+esc(r.year||'t.t.')},
- ref:r=>{const au=join(r.authors.map(a=>a.family+(a.given?', '+ini(a.given).join(' '):'')),', & ');let s=(au?esc(au)+' ':'')+'('+esc(r.year||'t.t.')+'). ';
-  if(r.type=='buku')s+='<i>'+esc(r.title)+'</i>.'+(r.publisher?' '+esc(r.publisher)+'.':'');
-  else if(r.type=='web')s+=esc(r.title)+'.'+(r.container?' <i>'+esc(r.container)+'</i>.':'');
-  else s+=esc(r.title)+'. <i>'+esc(r.container)+'</i>'+(r.volume?', <i>'+esc(r.volume)+'</i>':'')+(r.issue?'('+esc(r.issue)+')':'')+(r.pages?', '+esc(r.pages):'')+'.';
+apa:{hang:1,nd:'n.d.',
+ lab:r=>{const a=r.authors;if(!a.length)return shortT(r,r.type!='jurnal',['“','”']);return a.length==1?esc(a[0].family):a.length==2?esc(a[0].family)+' &amp; '+esc(a[1].family):esc(a[0].family)+' et al.'},
+ ref:r=>{const au=apaNames(r.authors),t=sc(r.title),has=!!au,y='('+esc(yrOf(r,'n.d.'))+').';
+  let s=has?esc(ends(au))+' '+y:(r.type=='jurnal'?esc(ends(t)):'<i>'+esc(ends(t))+'</i>')+' '+y;
+  if(r.type=='buku'){if(has&&t)s+=' <i>'+esc(ends(t))+'</i>';if(r.publisher)s+=' '+esc(ends(r.publisher))}
+  else if(r.type=='web'){if(has&&t)s+=' <i>'+esc(ends(t))+'</i>';if(r.container)s+=' '+esc(ends(r.container))}
+  else{if(has&&t)s+=' '+esc(ends(t));const j=[];if(r.container)j.push('<i>'+esc(r.container)+'</i>');
+    const vi=(r.volume?'<i>'+esc(r.volume)+'</i>':'')+(r.issue?'('+esc(r.issue)+')':'');if(vi)j.push(vi);if(r.pages)j.push(esc(r.pages));if(j.length)s+=' '+j.join(', ')+'.'}
   const u=doiU(r);return s+(u?' '+esc(u):'')}},
-harvard:{hang:1,
- cite:r=>{const a=r.authors;const n=!a.length?esc(r.title):a.length==1?esc(a[0].family):a.length==2?esc(a[0].family)+' and '+esc(a[1].family):esc(a[0].family)+' et al.';return n+', '+esc(r.year||'n.d.')},
- ref:r=>{const au=join(r.authors.map(a=>a.family+(a.given?', '+ini(a.given).join(''):'')),' and ');let s=(au?esc(au)+' ':'')+'('+esc(r.year||'n.d.')+') ';
-  if(r.type=='buku')s+='<i>'+esc(r.title)+'</i>.'+(r.publisher?' '+esc(r.publisher)+'.':'');
-  else if(r.type=='web')s+='<i>'+esc(r.title)+'</i>.'+(r.container?' '+esc(r.container)+'.':'');
-  else s+='‘'+esc(r.title)+'’, <i>'+esc(r.container)+'</i>'+(r.volume?', '+esc(r.volume):'')+(r.issue?'('+esc(r.issue)+')':'')+(r.pages?', pp. '+esc(r.pages):'')+'.';
+harvard:{hang:1,nd:'no date',
+ lab:r=>{const a=r.authors;if(!a.length)return shortT(r,true,['‘','’']);const f=i=>esc(a[i].family);
+  return a.length==1?f(0):a.length==2?f(0)+' and '+f(1):a.length==3?f(0)+', '+f(1)+' and '+f(2):f(0)+' et al.'},
+ ref:r=>{const au=hvNames(r.authors),t=sc(r.title),has=!!au,y='('+esc(yrOf(r,'no date'))+')';let s;
+  if(r.type=='jurnal'){const tt='‘'+esc(t)+'’',L=[];if(r.container)L.push('<i>'+esc(r.container)+'</i>');
+    const vi=esc(r.volume||'')+(r.issue?'('+esc(r.issue)+')':'');if(vi)L.push(vi);if(r.pages)L.push(pgs(r.pages));
+    s=has?esc(au)+' '+y+' '+tt+(L.length?', '+L.join(', '):'')+'.':tt+' '+y+(L.length?' '+L.join(', '):'')+'.'}
+  else{const tt='<i>'+esc(t)+'</i>',tail=r.type=='buku'?r.publisher:r.container;
+    s=(has?esc(au)+' '+y+' '+tt+'.':tt+' '+y)+(tail?' '+esc(ends(tail)):(has?'':'.'))}
   const u=doiU(r);return s+(u?' Available at: '+esc(u):'')}},
-ieee:{hang:0,
- cite:(r,i)=>'['+i+']',
- ref:(r,i)=>{const au=join(r.authors.map(a=>(a.given?ini(a.given).join(' ')+' ':'')+a.family),r.authors.length>2?', and ':' and ');const p=[];
-  if(r.type=='buku'){p.push('<i>'+esc(r.title)+'</i>');r.publisher&&p.push(esc(r.publisher));r.year&&p.push(esc(r.year))}
-  else{p.push('“'+esc(r.title)+',”');}
-  let s='['+i+'] '+(au?esc(au)+', ':'');
-  if(r.type=='buku')return s+p.join(', ')+'.';
-  const q=[];r.container&&q.push('<i>'+esc(r.container)+'</i>');r.volume&&q.push('vol. '+esc(r.volume));r.issue&&q.push('no. '+esc(r.issue));r.pages&&q.push('pp. '+esc(r.pages));r.year&&q.push(esc(r.year));
-  const u=doiU(r);return s+p[0]+' '+q.join(', ')+'.'+(u?' '+esc(u):'')}}
+ieee:{hang:0,nd:'',
+ ref:(r,n)=>{const au=ieNames(r.authors),t=sc(r.title),yv=esc(r.year||''),u=doiU(r);let s='['+n+'] ';
+  if(r.type=='buku'){s+=(au?esc(au)+', ':'')+'<i>'+esc(t)+'</i>.';if(r.publisher)s+=' '+esc(r.publisher)+(yv?', '+yv:'')+'.';else if(yv)s+=' '+yv+'.';if(u)s+=' [Online]. Available: '+esc(u)}
+  else if(r.type=='web'){s+=(au?esc(au)+', ':'')+'“'+esc(t)+',”';if(r.container)s+=' '+esc(r.container)+(yv?', '+yv:'')+'.';else if(yv)s+=' '+yv+'.';if(u)s+=' [Online]. Available: '+esc(u)}
+  else{const L=[];if(r.container)L.push('<i>'+esc(r.container)+'</i>');if(r.volume)L.push('vol. '+esc(r.volume));if(r.issue)L.push('no. '+esc(r.issue));if(r.pages)L.push(pgs(r.pages));if(yv)L.push(yv);
+    s+=(au?esc(au)+', ':'')+'“'+esc(t)+(L.length?',”':'.”')+(L.length?' '+L.join(', '):'');
+    if(r.doi)s+=(L.length?', ':' ')+'doi: '+esc(cleanDoi(r.doi));
+    if(L.length||r.doi)s+='.';if(!r.doi&&u)s+=' [Online]. Available: '+esc(u)}
+  return s}}
 };
+const sortKey=r=>(r.authors.length?auStr(r.authors):String(r.title)).toLowerCase();
+const cmpRef=(a,b)=>sortKey(a).localeCompare(sortKey(b))||(a.year||'').localeCompare(b.year||'')||String(a.title).localeCompare(String(b.title));
+function engine(f,cited){
+  YS=new Map();
+  if(f.hang){const g={};cited.forEach(r=>{const k=f.lab(r).toLowerCase()+'|'+(r.year||'');(g[k]=g[k]||[]).push(r)});
+    Object.values(g).forEach(l=>{if(l.length>1){l.sort(cmpRef);l.forEach((r,i)=>YS.set(r,String.fromCharCode(97+(i%26))))}})}
+  const num=new Map(cited.map((r,i)=>[r,i+1]));
+  const plain=h=>h.replace(/<[^>]+>/g,'');
+  const cmpCite=(a,b)=>plain(f.lab(a)).localeCompare(plain(f.lab(b)))||(a.year||'').localeCompare(b.year||'')||(YS.get(a)||'').localeCompare(YS.get(b)||'');
+  const cite=list=>{list=[...new Set(list)];
+    if(!f.hang)return ieNums(list.map(r=>num.get(r)).sort((a,b)=>a-b));
+    const o=[];list.sort(cmpCite).forEach(r=>{const l=f.lab(r),y=esc(yrOf(r,f.nd)),p=o[o.length-1];if(p&&p.l==l){if(!p.y.includes(y))p.y.push(y)}else o.push({l:l,y:[y]})});
+    return '('+o.map(x=>x.l+', '+x.y.join(', ')).join('; ')+')'};
+  const bib=()=>(f.hang?[...cited].sort(cmpRef):cited).map(r=>({k:'bib',h:f.ref(r,num.get(r)),hang:!!f.hang}));
+  return{cite:cite,bib:bib}
+}
 
 function render(){
   const q=$('#q').value.toLowerCase();
@@ -197,12 +261,11 @@ function render(){
   $('#count').textContent=sel.size+' dipilih';gen();renderDoc();
 }
 function gen(){
-  const f=F[$('#style').value];const s=refs.filter(r=>sel.has(r.id));
+  const f=F[curStyle],s=refs.filter(r=>sel.has(r.id));
   if(!s.length){$('#cites').innerHTML='<span class="mute">Pilih referensi di daftar untuk membuat sitasi.</span>';$('#bib').innerHTML='';return}
-  const ord=f.hang?[...s].sort((a,b)=>(auStr(a.authors)||a.title).localeCompare(auStr(b.authors)||b.title)):s;
-  const inner=s.map((r,i)=>f.cite(r,i+1));
-  $('#cites').innerHTML=f.hang?'('+inner.join('; ')+')':inner.join(', ');
-  $('#bib').innerHTML=ord.map((r,i)=>`<p class="bp" style="${f.hang?'margin:0 0 6pt .5in;text-indent:-.5in':'margin:0 0 6pt'}">${f.ref(r,f.hang?0:i+1)}</p>`).join('');
+  const E=engine(f,s);
+  $('#cites').innerHTML=E.cite(s);
+  $('#bib').innerHTML=E.bib().map(b=>`<p class="bp" style="${b.hang?'margin:0 0 6pt .5in;text-indent:-.5in':'margin:0 0 6pt'}">${b.h}</p>`).join('');
 }
 let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2400)}
 async function copy(html){
@@ -248,38 +311,43 @@ $('#file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileR
 
 let curStyle='apa';
 function setStyle(v){curStyle=v;$('#style').value=v;$('#style2').value=v;gen();renderDoc()}
-function ensureKeys(){const used=new Set(refs.filter(r=>r.key).map(r=>r.key));refs.forEach(r=>{if(r.key)return;const fam=(r.authors[0]&&r.authors[0].family)||(String(r.title).split(/\s+/)[0]||'ref');let b=fam.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'')+(r.year||'');if(!b)b='ref';let k=b,i=0;while(used.has(k)){k=b+String.fromCharCode(97+(i++%26))}r.key=k;used.add(k)})}
+function ensureKeys(){const used=new Set(refs.filter(r=>r.key).map(r=>r.key));refs.forEach(r=>{if(r.key)return;const a0=r.authors[0];let fam=(a0&&a0.family)||(String(r.title).split(/\s+/)[0]||'ref');if(a0&&!a0.given&&/\s/.test(fam.trim()))fam=fam.trim().split(/\s+/).filter(w=>/^[A-Z]/.test(w)).map(w=>w[0]).join('')||fam;let b=fam.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'')+(r.year||'');if(!b)b='ref';let k=b,i=0;while(used.has(k)){k=b+String.fromCharCode(97+(i++%26))}r.key=k;used.add(k)})}
 function showTab(n){$('#v-lib').hidden=n!='lib';$('#v-doc').hidden=n!='doc';$('#t-lib').setAttribute('aria-selected',n=='lib');$('#t-doc').setAttribute('aria-selected',n=='doc');if(n=='doc')renderDoc()}
 const saveDraft=()=>{try{localStorage.setItem('pustaka:draft',$('#draft').value)}catch(e){}};
 function insertDraft(txt){const t=$('#draft');const a=t.selectionStart==null?t.value.length:t.selectionStart,b=t.selectionEnd==null?a:t.selectionEnd;t.value=t.value.slice(0,a)+txt+t.value.slice(b);t.selectionStart=t.selectionEnd=a+txt.length;saveDraft();renderDoc()}
+function parseDraft(){
+  const re=/\[(@[\w:.\-]+(?:\s*;\s*@[\w:.\-]+)*)\]/g,byKey=new Map(refs.map(r=>[r.key,r])),order=[],lines=[];
+  $('#draft').value.split(/\r?\n/).forEach(l=>{if(!l.trim())return;const m=l.match(/^(#{1,2})\s+(.*)$/),k=m?(m[1].length==1?'h1':'h2'):'p',t=m?m[2]:l,parts=[];let i=0,x;re.lastIndex=0;
+    while((x=re.exec(t))){if(x.index>i)parts.push({t:t.slice(i,x.index)});const known=[],bad=[];
+      x[1].match(/@[\w:.\-]+/g).forEach(z=>{const kk=z.slice(1),r=byKey.get(kk);if(r){known.push(r);if(!order.includes(r))order.push(r)}else bad.push(kk)});
+      parts.push({c:known,bad:bad});i=re.lastIndex}
+    if(i<t.length)parts.push({t:t.slice(i)});lines.push({k:k,parts:parts})});
+  return{lines:lines,order:order}}
 function build(){
-  const f=F[curStyle],byKey=new Map(refs.map(r=>[r.key,r])),order=[];
-  const cit=g=>{const ks=(g.match(/@[\w:.\-]+/g)||[]).map(k=>k.slice(1));
-    const parts=ks.map(k=>{const r=byKey.get(k);if(!r)return '<mark>?'+esc(k)+'</mark>';if(!order.includes(r))order.push(r);return f.hang?f.cite(r):f.cite(r,order.indexOf(r)+1)});
-    return f.hang?'('+parts.join('; ')+')':parts.join(', ')};
-  const inl=t=>{const re=/\[(@[\w:.\-]+(?:\s*;\s*@[\w:.\-]+)*)\]/g;let o='',i=0,m;while((m=re.exec(t))){o+=esc(t.slice(i,m.index))+cit(m[1]);i=re.lastIndex}return o+esc(t.slice(i))};
-  const blocks=[];
-  $('#draft').value.split(/\r?\n/).forEach(l=>{if(!l.trim())return;const m=l.match(/^(#{1,2})\s+(.*)$/);blocks.push(m?{k:m[1].length==1?'h1':'h2',h:inl(m[2])}:{k:'p',h:inl(l)})});
-  if(order.length){const ord=f.hang?[...order].sort((a,b)=>(auStr(a.authors)||a.title).localeCompare(auStr(b.authors)||b.title)):order;
-    blocks.push({k:'bt',h:'Daftar Pustaka'});ord.forEach(r=>blocks.push({k:'bib',h:f.ref(r,f.hang?0:order.indexOf(r)+1),hang:f.hang}))}
+  const f=F[curStyle],P=parseDraft(),E=engine(f,P.order);
+  const blocks=P.lines.map(L=>({k:L.k,h:L.parts.map(p=>p.t!=null?esc(p.t):(p.c.length?E.cite(p.c):'')+(p.bad.length?(p.c.length?' ':'')+p.bad.map(b=>'<mark>?'+esc(b)+'</mark>').join(' '):'')).join('')}));
+  if(P.order.length){blocks.push({k:'bt',h:'Daftar Pustaka'});E.bib().forEach(b=>blocks.push(b))}
   return blocks}
-const ST={p:"margin:0 0 8pt;text-align:justify;line-height:1.5;font-family:'Times New Roman',serif;font-size:12pt",h1:"margin:14pt 0 6pt;font:bold 13pt 'Times New Roman',serif",h2:"margin:12pt 0 6pt;font:bold 12pt 'Times New Roman',serif",bt:"margin:18pt 0 8pt;text-align:center;font:bold 12pt 'Times New Roman',serif",bibh:"margin:0 0 6pt .5in;text-indent:-.5in;line-height:1.5;font-family:'Times New Roman',serif;font-size:12pt",bib:"margin:0 0 6pt;line-height:1.5;font-family:'Times New Roman',serif;font-size:12pt"};
-function blockHtml(b,inl){const cls={p:'',h1:' class="ph1"',h2:' class="ph2"',bt:' class="pbt"',bib:b.hang?' class="hang"':''}[b.k];const st=inl?` style="${ST[b.k=='bib'?(b.hang?'bibh':'bib'):b.k]}"`:'';return `<p${inl?'':cls}${st}>${b.h}</p>`}
+const ST={p:"margin:0 0 8pt;text-align:justify;line-height:1.5;font-family:'Times New Roman',serif;font-size:12pt",h1:"margin:14pt 0 6pt;font:bold 14pt 'Times New Roman',serif",h2:"margin:12pt 0 6pt;font:bold 12pt 'Times New Roman',serif",bt:"margin:18pt 0 8pt;text-align:center;font:bold 12pt 'Times New Roman',serif",bibh:"margin:0 0 6pt .5in;text-indent:-.5in;text-align:left;line-height:1.5;font-family:'Times New Roman',serif;font-size:12pt",bib:"margin:0 0 6pt .4in;text-indent:-.4in;text-align:left;line-height:1.5;font-family:'Times New Roman',serif;font-size:12pt"};
+function blockHtml(b,inl){const cls={p:'',h1:' class="ph1"',h2:' class="ph2"',bt:' class="pbt"',bib:b.hang?' class="bib hang"':' class="bib"'}[b.k];const st=inl?` style="${ST[b.k=='bib'?(b.hang?'bibh':'bib'):b.k]}"`:'';return `<p${inl?'':cls}${st}>${b.h}</p>`}
 function renderDoc(){const b=build();$('#paper').innerHTML=b.length?b.map(x=>blockHtml(x,false)).join(''):'<p class="mute">Pratinjau muncul di sini setelah kamu menulis naskah.</p>'}
+function htmlRuns(html){const out=[],re=/<(\/?)(i|b|mark)>|([^<]+)/g,dec=x=>x.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&');let it=0,bd=0,m;
+  while((m=re.exec(html))){if(m[3]!=null)out.push({t:dec(m[3]),i:it>0,b:bd>0});else if(m[2]=='i')it+=m[1]?-1:1;else if(m[2]=='b')bd+=m[1]?-1:1}return out}
+function docBuild(D,blocks){
+  const R=(h,o)=>htmlRuns(h).map(x=>new D.TextRun({text:x.t,italics:x.i,bold:x.b||!!(o&&o.bold),font:'Times New Roman',size:(o&&o.size)||24,color:'000000'}));
+  const kids=blocks.map(b=>{
+    if(b.k=='h1')return new D.Paragraph({heading:D.HeadingLevel.HEADING_1,children:R(b.h,{bold:1,size:28})});
+    if(b.k=='h2')return new D.Paragraph({heading:D.HeadingLevel.HEADING_2,children:R(b.h,{bold:1,size:24})});
+    if(b.k=='bt')return new D.Paragraph({heading:D.HeadingLevel.HEADING_1,alignment:D.AlignmentType.CENTER,children:R(b.h,{bold:1,size:24})});
+    if(b.k=='bib')return new D.Paragraph({alignment:D.AlignmentType.LEFT,spacing:{after:120,line:360},indent:b.hang?{left:720,hanging:720}:{left:567,hanging:567},children:R(b.h)});
+    return new D.Paragraph({alignment:D.AlignmentType.JUSTIFIED,spacing:{after:120,line:360},indent:{firstLine:720},children:R(b.h)})});
+  const hs=(size,before,after)=>({run:{font:'Times New Roman',size:size,bold:true,color:'000000'},paragraph:{spacing:{before:before,after:after},keepNext:true}});
+  return new D.Document({styles:{default:{document:{run:{font:'Times New Roman',size:24}},heading1:hs(28,240,120),heading2:hs(24,200,100)}},sections:[{properties:{page:{margin:{top:2268,left:2268,right:1701,bottom:1701}}},children:kids}]})}
 async function dlDoc(){
   if(!window.docx){toast('Pustaka dokumen belum termuat. Periksa koneksi internet.');return}
   const bl=build();if(!bl.length){toast('Naskah masih kosong.');return}
-  const D=window.docx;
-  const runs=(html,bold,size)=>{const d=document.createElement('div');d.innerHTML=html;const out=[];const w=(n,it,bd)=>n.childNodes.forEach(c=>{if(c.nodeType==3){if(c.textContent)out.push(new D.TextRun({text:c.textContent,italics:it,bold:bd,font:'Times New Roman',size:size||24,color:'000000'}))}else w(c,it||c.tagName=='I',bd||c.tagName=='B')});w(d,false,!!bold);return out};
-  const kids=bl.map(b=>{
-    if(b.k=='h1')return new D.Paragraph({spacing:{before:240,after:120},keepNext:true,children:runs(b.h,true,26)});
-    if(b.k=='h2')return new D.Paragraph({spacing:{before:200,after:100},keepNext:true,children:runs(b.h,true,24)});
-    if(b.k=='bt')return new D.Paragraph({alignment:D.AlignmentType.CENTER,spacing:{before:360,after:240},children:runs(b.h,true,24)});
-    if(b.k=='bib')return new D.Paragraph({spacing:{after:120,line:360},indent:b.hang?{left:720,hanging:720}:undefined,children:runs(b.h)});
-    return new D.Paragraph({alignment:D.AlignmentType.JUSTIFIED,spacing:{after:120,line:360},indent:{firstLine:720},children:runs(b.h)})});
   try{
-    const doc=new D.Document({sections:[{properties:{page:{margin:{top:2268,left:2268,right:1701,bottom:1701}}},children:kids}]});
-    const blob=await D.Packer.toBlob(doc);const url=URL.createObjectURL(blob);const a=document.createElement('a');
+    const blob=await window.docx.Packer.toBlob(docBuild(window.docx,bl));const url=URL.createObjectURL(blob);const a=document.createElement('a');
     a.href=url;a.download='naskah-pustaka.docx';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);toast('Mengunduh naskah-pustaka.docx')
   }catch(e){toast('Gagal membuat .docx.')}
 }
